@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>บัญชีรายรับรายจ่าย (Supabase)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@100..900&display=swap" rel="stylesheet" />
+
+  <script src="./config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg: #f5f7ff;
+      --bg-2: #eef2ff;
+      --bg-3: #f7f4ff;
+      --surface: rgba(255, 255, 255, 0.7);
+      --surface-strong: rgba(255, 255, 255, 0.88);
+      --surface-soft: rgba(245, 247, 255, 0.88);
+      --border: rgba(123, 130, 201, 0.18);
+      --border-strong: rgba(91, 99, 182, 0.26);
+      --text: #1e213f;
+      --text-muted: #6d7298;
+      --headline: #1a1d35;
+      --primary: #6166f5;
+      --primary-2: #7b7fff;
+      --primary-soft: rgba(97, 102, 245, 0.12);
+      --accent: #ffb44d;
+      --accent-soft: rgba(255, 180, 77, 0.16);
+      --income: #1d8f63;
+      --income-soft: rgba(29, 143, 99, 0.12);
+      --income-border: rgba(29, 143, 99, 0.22);
+      --expense: #d85757;
+      --expense-soft: rgba(216, 87, 87, 0.12);
+      --expense-border: rgba(216, 87, 87, 0.22);
+      --shadow-lg: 0 24px 70px rgba(68, 76, 140, 0.14);
+      --shadow-md: 0 14px 30px rgba(68, 76, 140, 0.1);
+      --shadow-sm: 0 10px 18px rgba(68, 76, 140, 0.08);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --blur: blur(18px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      background:
+        radial-gradient(circle at top left, rgba(122, 127, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(255, 182, 105, 0.15), transparent 24%),
+        radial-gradient(circle at 50% 0%, rgba(178, 190, 255, 0.18), transparent 34%),
+        linear-gradient(180deg, #f8f9ff 0%, #f2f5ff 42%, #f8f7ff 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    body::before {
+      width: 320px;
+      height: 320px;
+      left: -80px;
+      top: -100px;
+      background: rgba(122, 127, 255, 0.18);
+    }
+
+    body::after {
+      width: 340px;
+      height: 340px;
+      right: -100px;
+      top: 120px;
+      background: rgba(255, 196, 127, 0.14);
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+    }
+
+    .glass {
+      background: var(--surface);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      width: min(1180px, calc(100% - 24px));
+      margin: 16px auto 0;
+      padding: 14px 16px;
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      box-shadow: 0 18px 40px rgba(77, 88, 152, 0.13);
+    }
+
+    .topbar-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .logo-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 58%, #9fa7ff 100%);
+      box-shadow: 0 14px 26px rgba(97, 102, 245, 0.28);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .topbar-text {
+      min-width: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      margin-bottom: 6px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #5b63f4 0%, #777cff 100%);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 12px 26px rgba(91, 99, 244, 0.22);
+    }
+
+    .topbar h1 {
+      font-size: 18px;
+      line-height: 1.3;
+      font-weight: 800;
+      color: var(--headline);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 180, 77, 0.16);
+      color: #9a6200;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .btn {
+      border: 0;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 800;
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      transition: 0.22s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.72;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-sm {
+      padding: 10px 14px;
+      font-size: 13px;
+      border-radius: 12px;
+    }
+
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+      box-shadow: 0 14px 24px rgba(97, 102, 245, 0.24);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 18px 28px rgba(97, 102, 245, 0.28);
+    }
+
+    .btn-ghost {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(123, 130, 201, 0.18);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-ghost:hover {
+      background: #fff;
+    }
+
+    .btn-pdf {
+      color: #fff;
+      background: linear-gradient(135deg, #3f47d5 0%, #6a70ff 100%);
+      box-shadow: 0 14px 24px rgba(77, 88, 214, 0.25);
+    }
+
+    .btn-pdf:hover {
+      box-shadow: 0 18px 30px rgba(77, 88, 214, 0.28);
+    }
+
+    .btn-del {
+      color: var(--expense);
+      background: var(--expense-soft);
+      border: 1px solid var(--expense-border);
+    }
+
+    .btn-del:hover {
+      background: rgba(216, 87, 87, 0.18);
+    }
+
+    .container {
+      width: min(1180px, calc(100% - 24px));
+      margin: 18px auto 0;
+      padding: 0 0 90px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      margin-bottom: 18px;
+      border-radius: var(--radius-xl);
+    }
+
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      inset: auto -60px -100px auto;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(123, 127, 255, 0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: -100px auto auto -80px;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 180, 77, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.45fr 0.95fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .hero-copy h2 {
+      font-size: clamp(30px, 5vw, 58px);
+      line-height: 1.05;
+      font-weight: 900;
+      color: var(--headline);
+      margin-bottom: 12px;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-copy p {
+      font-size: 17px;
+      line-height: 1.75;
+      color: var(--text-muted);
+      max-width: 680px;
+    }
+
+    .hero-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .hero-tag {
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-mini {
+      padding: 18px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(246,248,255,0.96) 100%);
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      box-shadow: var(--shadow-md);
+    }
+
+    .hero-mini-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .hero-mini-value {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--headline);
+      line-height: 1.15;
+    }
+
+    .hero-mini-sub {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .sum-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius-lg);
+      padding: 22px 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(248,249,255,0.92) 100%);
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      box-shadow: var(--shadow-md);
+    }
+
+    .sum-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      border-radius: 999px;
+    }
+
+    .sum-card.income-card::before {
+      background: linear-gradient(180deg, #19a06d 0%, #62c9a0 100%);
+    }
+
+    .sum-card.expense-card::before {
+      background: linear-gradient(180deg, #df5f5f 0%, #ff9898 100%);
+    }
+
+    .sum-card.balance-card::before {
+      background: linear-gradient(180deg, #6166f5 0%, #8a8eff 100%);
+    }
+
+    .sum-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .sum-label {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .sum-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .income-card .sum-icon {
+      color: var(--income);
+      background: var(--income-soft);
+    }
+
+    .expense-card .sum-icon {
+      color: var(--expense);
+      background: var(--expense-soft);
+    }
+
+    .balance-card .sum-icon {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .sum-value {
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 900;
+      line-height: 1.08;
+      color: var(--headline);
+      letter-spacing: -0.03em;
+    }
+
+    .income-card .sum-value {
+      color: var(--income);
+    }
+
+    .expense-card .sum-value {
+      color: var(--expense);
+    }
+
+    .balance-card .sum-value {
+      color: var(--primary);
+    }
+
+    .tabs {
+      padding: 6px;
+      display: flex;
+      gap: 6px;
+      border-radius: 20px;
+      margin-bottom: 18px;
+      background: rgba(255, 255, 255, 0.62);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(123, 130, 201, 0.14);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab {
+      flex: 1;
+      border: 0;
+      cursor: pointer;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 800;
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      transition: 0.2s ease;
+    }
+
+    .tab.active {
+      color: var(--headline);
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(243,246,255,0.98) 100%);
+      box-shadow: 0 12px 22px rgba(77, 88, 152, 0.09);
+    }
+
+    .panel {
+      display: none;
+      animation: fadeIn 0.24s ease;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .card {
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(123, 130, 201, 0.14);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--headline);
+      margin-bottom: 6px;
+    }
+
+    .section-subtitle {
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    .edit-indicator {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255, 180, 77, 0.16) 0%, rgba(255, 228, 177, 0.32) 100%);
+      border: 1px solid rgba(255, 180, 77, 0.34);
+      color: #915b00;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .edit-indicator.show {
+      display: flex;
+    }
+
+    .type-toggle {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .type-btn {
+      padding: 15px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(123, 130, 201, 0.14);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 800;
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      cursor: pointer;
+      transition: 0.2s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .type-btn.active-income {
+      color: var(--income);
+      border-color: var(--income-border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(232,247,240,0.95) 100%);
+      box-shadow: 0 14px 24px rgba(29, 143, 99, 0.12);
+    }
+
+    .type-btn.active-expense {
+      color: var(--expense);
+      border-color: var(--expense-border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(254,240,240,0.95) 100%);
+      box-shadow: 0 14px 24px rgba(216, 87, 87, 0.12);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .form-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .form-input,
+    .form-select,
+    textarea.form-input {
+      width: 100%;
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 13px 16px;
+      outline: none;
+      font-size: 15px;
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      transition: 0.2s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+    }
+
+    .form-input::placeholder {
+      color: #a1a6c5;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    textarea.form-input:focus {
+      border-color: rgba(97, 102, 245, 0.34);
+      box-shadow: 0 0 0 4px rgba(97, 102, 245, 0.12);
+      background: #fff;
+    }
+
+    .form-select {
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #8a90c4 50%),
+        linear-gradient(135deg, #8a90c4 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) calc(50% - 4px),
+        calc(100% - 12px) calc(50% - 4px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 42px;
+    }
+
+    .amount-wrap {
+      position: relative;
+    }
+
+    .amount-prefix {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--primary);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .amount-wrap .form-input {
+      height: 62px;
+      padding-left: 42px;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--headline);
+    }
+
+    .cat-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .cat-pill {
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      background: rgba(255,255,255,0.8);
+      color: var(--text-muted);
+      padding: 8px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: "Noto Sans Thai Variable", "Noto Sans Thai", sans-serif;
+      cursor: pointer;
+      transition: 0.2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cat-pill:hover {
+      color: var(--primary);
+      border-color: rgba(97, 102, 245, 0.24);
+      background: #fff;
+    }
+
+    .cat-pill.selected {
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+      border-color: transparent;
+      box-shadow: 0 12px 20px rgba(97, 102, 245, 0.22);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .aside-panel {
+      border-radius: 22px;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(248,250,255,0.95) 0%, rgba(255,255,255,0.88) 100%);
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .aside-panel h3 {
+      font-size: 16px;
+      font-weight: 900;
+      color: var(--headline);
+      margin-bottom: 6px;
+    }
+
+    .aside-panel p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .quick-stats {
+      display: grid;
+      gap: 10px;
+    }
+
+    .quick-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.78);
+      border: 1px solid rgba(123, 130, 201, 0.12);
+    }
+
+    .quick-stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .quick-stat-value {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--headline);
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .form-actions .btn {
+      min-height: 50px;
+    }
+
+    .form-actions .btn-primary {
+      flex: 1;
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: 1.2fr auto auto;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .search-input {
+      min-width: 0;
+    }
+
+    .entry-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .month-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 4px 0;
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .month-header span:last-child {
+      font-weight: 900;
+      color: var(--headline);
+    }
+
+    .entry-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,249,255,0.96) 100%);
+      border: 1px solid rgba(123, 130, 201, 0.14);
+      box-shadow: var(--shadow-sm);
+      transition: 0.18s ease;
+    }
+
+    .entry-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 28px rgba(68, 76, 140, 0.12);
+    }
+
+    .entry-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.03);
+    }
+
+    .entry-dot.income {
+      background: var(--income);
+      box-shadow: 0 0 0 7px rgba(29, 143, 99, 0.1);
+    }
+
+    .entry-dot.expense {
+      background: var(--expense);
+      box-shadow: 0 0 0 7px rgba(216, 87, 87, 0.1);
+    }
+
+    .entry-info {
+      min-width: 0;
+    }
+
+    .entry-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--headline);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .entry-meta {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .entry-cat {
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(97, 102, 245, 0.08);
+      color: var(--primary);
+      border: 1px solid rgba(97, 102, 245, 0.12);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .entry-amount {
+      font-size: 17px;
+      font-weight: 900;
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+    }
+
+    .entry-amount.income {
+      color: var(--income);
+    }
+
+    .entry-amount.expense {
+      color: var(--expense);
+    }
+
+    .entry-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 56px 20px;
+      color: var(--text-muted);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(247,249,255,0.96) 100%);
+      border: 1px dashed rgba(123, 130, 201, 0.22);
+    }
+
+    .empty-state .big {
+      font-size: 46px;
+      margin-bottom: 12px;
+    }
+
+    .empty-state p {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--headline);
+    }
+
+    .empty-state small {
+      display: block;
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 220;
+      background: rgba(20, 24, 49, 0.22);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(460px, 100%);
+      border-radius: 26px;
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(123, 130, 201, 0.16);
+      box-shadow: 0 30px 60px rgba(32, 38, 90, 0.22);
+      animation: modalIn 0.22s ease;
+    }
+
+    .modal h3 {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--headline);
+      margin-bottom: 18px;
+      text-align: center;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+      min-height: 48px;
+    }
+
+    .positive {
+      color: var(--income) !important;
+    }
+
+    .negative {
+      color: var(--expense) !important;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-copy p {
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        width: calc(100% - 16px);
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 18px;
+      }
+
+      .container {
+        width: calc(100% - 16px);
+        margin-top: 12px;
+      }
+
+      .hero-card,
+      .card {
+        padding: 18px;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .entry-item {
+        grid-template-columns: auto 1fr;
+        align-items: start;
+      }
+
+      .entry-amount {
+        grid-column: 2;
+      }
+
+      .entry-actions {
+        grid-column: 2;
+        justify-content: flex-start;
+      }
+
+      .modal-actions,
+      .form-actions {
+        flex-direction: column;
+      }
+
+      .hero-mini-value {
+        font-size: 24px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .hero-copy h2 {
+        font-size: 34px;
+      }
+
+      .topbar h1 {
+        font-size: 16px;
+      }
+
+      .type-toggle {
+        grid-template-columns: 1fr;
+      }
+
+      .logo-icon {
+        width: 42px;
+        height: 42px;
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="topbar-title">
+        <div class="logo-icon">฿</div>
+        <div class="topbar-text">
+          <div class="eyebrow">บัญชีการเงินส่วนตัว</div>
+          <h1>
+            บัญชีรายรับรายจ่าย
+            <span id="syncStatus" class="status-badge" style="display:none;">⏳ กำลังซิงค์ข้อมูล</span>
+          </h1>
+        </div>
+      </div>
+      <button class="btn btn-pdf btn-sm" onclick="openPdfModal()">ดาวน์โหลด PDF</button>
+    </div>
+
+    <div class="modal-overlay" id="pdfModal">
+      <div class="modal">
+        <h3>ส่งออกรายงาน PDF</h3>
+        <div class="form-group">
+          <label class="form-label">เดือน (ปล่อยว่าง = ทั้งหมด)</label>
+          <input type="month" id="pdfMonth" class="form-input" />
+        </div>
+        <div class="form-group" style="margin-top:14px;">
+          <label class="form-label">ประเภท</label>
+          <select id="pdfType" class="form-select">
+            <option value="all">ทุกประเภท</option>
+            <option value="income">รายรับ</option>
+            <option value="expense">รายจ่าย</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closePdfModal()">ยกเลิก</button>
+          <button class="btn btn-pdf" id="pdfExportBtn" onclick="exportPDF()">สร้างและดาวน์โหลด</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="hero-card glass">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h2>เว็บรายรับรายจ่าย<br />เรียบ สะอาด ใช้ง่าย</h2>
+            <p>
+              จัดการรายการรับเข้าและจ่ายออกในหน้าเดียว พร้อมสรุปยอด ค้นหา แก้ไข ลบ และส่งออก PDF โดยคงข้อมูลและโครงสร้างเดิมของระบบไว้
+            </p>
+            <div class="hero-tags">
+              <div class="hero-tag" id="heroDate">-</div>
+              <div class="hero-tag" id="heroCount">0 รายการ</div>
+              <div class="hero-tag">เชื่อมต่อ Supabase</div>
+            </div>
+          </div>
+
+          <div class="hero-side">
+            <div class="hero-mini">
+              <div class="hero-mini-label">ภาพรวมคงเหลือ</div>
+              <div class="hero-mini-value" id="heroBalance">฿0</div>
+              <div class="hero-mini-sub">อัปเดตอัตโนมัติตามรายการทั้งหมดในระบบ</div>
+            </div>
+            <div class="hero-mini">
+              <div class="hero-mini-label">สถานะการใช้งาน</div>
+              <div class="hero-mini-sub" id="heroStatus">
+                พร้อมใช้งานสำหรับเพิ่มรายการ แก้ไขรายการ และดูประวัติย้อนหลัง
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="sum-card income-card">
+          <div class="sum-top">
+            <div class="sum-label">รายรับรวม</div>
+            <div class="sum-icon">↗</div>
+          </div>
+          <div class="sum-value" id="totalIncome">฿0</div>
+        </div>
+
+        <div class="sum-card expense-card">
+          <div class="sum-top">
+            <div class="sum-label">รายจ่ายรวม</div>
+            <div class="sum-icon">↘</div>
+          </div>
+          <div class="sum-value" id="totalExpense">฿0</div>
+        </div>
+
+        <div class="sum-card balance-card">
+          <div class="sum-top">
+            <div class="sum-label">คงเหลือสุทธิ</div>
+            <div class="sum-icon">◎</div>
+          </div>
+          <div class="sum-value" id="balance">฿0</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" id="tab-add" onclick="switchTab('add')">เพิ่มรายการ</button>
+        <button class="tab" id="tab-list" onclick="switchTab('list')">รายการทั้งหมด</button>
+      </div>
+
+      <div class="panel active" id="panel-add">
+        <div class="card">
+          <div class="section-title">บันทึกรายการใหม่</div>
+          <div class="section-subtitle">เพิ่มรายรับหรือรายจ่าย พร้อมหมวดหมู่ วันที่ และหมายเหตุ ได้จากฟอร์มเดียว</div>
+
+          <div class="edit-indicator" id="editIndicator">
+            กำลังแก้ไขรายการ: <span id="editTitle"></span>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="cancelEdit()">ยกเลิกการแก้ไข</button>
+          </div>
+
+          <div class="type-toggle">
+            <button class="type-btn active-income" id="btn-income" onclick="setType('income')">รายรับ</button>
+            <button class="type-btn" id="btn-expense" onclick="setType('expense')">รายจ่าย</button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-stack">
+              <div class="form-group">
+                <label class="form-label">จำนวนเงิน (บาท)</label>
+                <div class="amount-wrap">
+                  <span class="amount-prefix">฿</span>
+                  <input type="number" id="amount" class="form-input" placeholder="0.00" min="0" step="0.01" inputmode="decimal" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">รายละเอียด</label>
+                <input type="text" id="title" class="form-input" placeholder="เช่น เงินเดือน, ค่ากาแฟ, ค่าเดินทาง" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">หมวดหมู่</label>
+                <div class="cat-pills" id="catPills"></div>
+                <input type="text" id="category" class="form-input" placeholder="หรือพิมพ์หมวดหมู่เอง..." />
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">วันที่</label>
+                  <input type="date" id="date" class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">หมายเหตุ</label>
+                  <input type="text" id="note" class="form-input" placeholder="ไม่บังคับ" />
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-primary" onclick="saveEntry()" id="btnSave">บันทึกรายการ</button>
+                <button class="btn btn-ghost" onclick="resetForm()">ล้างค่า</button>
+              </div>
+            </div>
+
+            <div class="aside-panel">
+              <h3>สรุปก่อนบันทึก</h3>
+              <p>เลือกประเภทให้ถูกต้อง แล้วใส่รายละเอียดที่ช่วยให้ค้นหาย้อนหลังได้ง่าย เช่น ที่มาเงิน หรือเหตุผลในการใช้จ่าย</p>
+
+              <div class="quick-stats">
+                <div class="quick-stat">
+                  <div class="quick-stat-label">ประเภทที่เลือก</div>
+                  <div class="quick-stat-value" id="previewType">รายรับ</div>
+                </div>
+                <div class="quick-stat">
+                  <div class="quick-stat-label">หมวดหมู่ล่าสุด</div>
+                  <div class="quick-stat-value" id="previewCategory">-</div>
+                </div>
+                <div class="quick-stat">
+                  <div class="quick-stat-label">วันที่ทำรายการ</div>
+                  <div class="quick-stat-value" id="previewDate">-</div>
+                </div>
+                <div class="quick-stat">
+                  <div class="quick-stat-label">จำนวนทั้งหมดในระบบ</div>
+                  <div class="quick-stat-value" id="previewCount">0 รายการ</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-list">
+        <div class="card">
+          <div class="section-title">รายการทั้งหมด</div>
+          <div class="section-subtitle">ค้นหาตามคำอธิบาย หมวดหมู่ หมายเหตุ ประเภท หรือเดือนที่ต้องการ</div>
+
+          <div class="filter-bar">
+            <input type="text" id="search" class="form-input search-input" placeholder="ค้นหา..." oninput="renderList()" />
+            <select id="filterType" class="form-select" onchange="renderList()">
+              <option value="all">ทุกประเภท</option>
+              <option value="income">รายรับ</option>
+              <option value="expense">รายจ่าย</option>
+            </select>
+            <input type="month" id="filterMonth" class="form-input" onchange="renderList()" />
+          </div>
+
+          <div id="entryList">
+            <div class="empty-state">
+              <p>กำลังโหลดข้อมูล...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const supabaseUrl = window.APP_CONFIG?.SUPABASE_URL || "";
+    const supabaseKey = window.APP_CONFIG?.SUPABASE_ANON_KEY || "";
+    const isSupabaseReady = Boolean(supabaseUrl && supabaseKey && window.supabase?.createClient);
+    const _supabase = isSupabaseReady ? window.supabase.createClient(supabaseUrl, supabaseKey) : null;
+
+    let entries = [];
+    let currentType = "income";
+    let editingId = null;
+
+    const CATS = {
+      income: ["เงินเดือน", "ค่าจ้าง", "โบนัส", "ดอกเบี้ย", "เงินปันผล", "ขายของ", "อื่นๆ"],
+      expense: ["อาหาร", "เดินทาง", "ที่พัก", "สุขภาพ", "ช้อปปิ้ง", "บันเทิง", "บิล/ค่าน้ำค่าไฟ", "ครอบครัว", "การศึกษา", "อื่นๆ"]
+    };
+
+    const MONTHS_TH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+    function today() {
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
+    function fmt(n) {
+      return new Intl.NumberFormat("th-TH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      }).format(Number(n || 0));
+    }
+
+    function fc(n) {
+      return "฿" + fmt(n);
+    }
+
+    function moneySigned(n) {
+      const num = Number(n || 0);
+      return num < 0 ? "-฿" + fmt(Math.abs(num)) : "฿" + fmt(num);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeJsString(value) {
+      return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r/g, "\\r")
+        .replace(/\n/g, "\\n");
+    }
+
+    function normalizeEntry(entry) {
+      return {
+        ...entry,
+        id: entry.id,
+        type: entry.type === "expense" ? "expense" : "income",
+        title: String(entry.title ?? ""),
+        category: String(entry.category ?? ""),
+        note: String(entry.note ?? ""),
+        date: String(entry.date ?? today()),
+        amount: Number(entry.amount ?? 0),
+        created_at: entry.created_at ?? ""
+      };
+    }
+
+    function compareEntries(a, b) {
+      const dateCompare = String(b.date || "").localeCompare(String(a.date || ""));
+      if (dateCompare !== 0) return dateCompare;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    }
+
+    function formatThaiDate(dateStr) {
+      if (!dateStr) return "-";
+      const d = new Date(dateStr + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      });
+    }
+
+    function formatThaiMonthYear(monthStr) {
+      if (!monthStr) return "ทั้งหมด";
+      const [y, m] = monthStr.split("-");
+      const idx = Number(m) - 1;
+      if (idx < 0 || idx > 11) return monthStr;
+      return MONTHS_TH[idx] + " " + (Number(y) + 543);
+    }
+
+    function typeLabel(type) {
+      if (type === "income") return "รายรับ";
+      if (type === "expense") return "รายจ่าย";
+      return "ทุกประเภท";
+    }
+
+    function showLoading(show) {
+      const badge = document.getElementById("syncStatus");
+      if (badge) {
+        badge.style.display = show ? "inline-flex" : "none";
+      }
+    }
+
+    function syncSaveButtonLabel() {
+      const btnSave = document.getElementById("btnSave");
+      if (!btnSave) return;
+      btnSave.textContent = editingId ? "บันทึกการแก้ไข" : "บันทึกรายการ";
+    }
+
+    function updatePreviewBox() {
+      const category = document.getElementById("category")?.value?.trim() || "-";
+      const date = document.getElementById("date")?.value || today();
+
+      document.getElementById("previewType").textContent = currentType === "income" ? "รายรับ" : "รายจ่าย";
+      document.getElementById("previewCategory").textContent = category;
+      document.getElementById("previewDate").textContent = formatThaiDate(date);
+      document.getElementById("previewCount").textContent = entries.length + " รายการ";
+    }
+
+    function updateHeroMeta(balance = 0) {
+      document.getElementById("heroDate").textContent = new Date().toLocaleDateString("th-TH", {
+        dateStyle: "full"
+      });
+      document.getElementById("heroCount").textContent = entries.length + " รายการ";
+      document.getElementById("heroBalance").textContent = moneySigned(balance);
+
+      const heroStatus = document.getElementById("heroStatus");
+      if (!isSupabaseReady) {
+        heroStatus.textContent = "ยังไม่ได้ตั้งค่า config.js กรุณาใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ก่อนใช้งาน";
+      } else if (!entries.length) {
+        heroStatus.textContent = "ระบบพร้อมใช้งานแล้ว เริ่มเพิ่มรายการแรกของคุณได้ทันที";
+      } else {
+        heroStatus.textContent = "มีข้อมูลพร้อมใช้งาน สามารถค้นหา แก้ไข ลบ และส่งออก PDF ได้ตามปกติ";
+      }
+    }
+
+    function renderConfigMessage() {
+      const cont = document.getElementById("entryList");
+      cont.innerHTML = `
+        <div class="empty-state">
+          <div class="big">⚙️</div>
+          <p>ยังไม่ได้ตั้งค่า config.js</p>
+          <small>สร้างไฟล์ config.js แล้วใส่ SUPABASE_URL กับ SUPABASE_ANON_KEY</small>
+        </div>
+      `;
+    }
+
+    async function fetchEntries() {
+      if (!isSupabaseReady) {
+        renderSummary();
+        renderConfigMessage();
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const { data, error } = await _supabase
+          .from("budget_entries")
+          .select("*");
+
+        if (error) throw error;
+
+        entries = (data || [])
+          .map(normalizeEntry)
+          .sort(compareEntries);
+
+        renderSummary();
+        renderList();
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    async function saveEntry() {
+      if (!isSupabaseReady) {
+        alert("ยังไม่ได้ตั้งค่า config.js");
+        return;
+      }
+
+      const amount = parseFloat(document.getElementById("amount").value);
+      const title = document.getElementById("title").value.trim();
+      const date = document.getElementById("date").value;
+
+      if (!amount || amount <= 0) {
+        alert("กรุณาใส่จำนวนเงิน");
+        return;
+      }
+
+      if (!title) {
+        alert("กรุณาใส่รายละเอียด");
+        return;
+      }
+
+      if (!date) {
+        alert("กรุณาเลือกวันที่");
+        return;
+      }
+
+      const entryData = {
+        type: currentType,
+        title,
+        category: document.getElementById("category").value.trim() || "อื่นๆ",
+        amount,
+        date,
+        note: document.getElementById("note").value.trim()
+      };
+
+      const btnSave = document.getElementById("btnSave");
+      btnSave.disabled = true;
+      btnSave.textContent = "กำลังบันทึก...";
+      showLoading(true);
+
+      try {
+        if (editingId) {
+          const { error } = await _supabase
+            .from("budget_entries")
+            .update(entryData)
+            .eq("id", editingId);
+
+          if (error) throw error;
+        } else {
+          const { error } = await _supabase
+            .from("budget_entries")
+            .insert([entryData]);
+
+          if (error) throw error;
+        }
+
+        await fetchEntries();
+        resetForm();
+        switchTab("list");
+      } catch (error) {
+        console.error("Error saving data:", error);
+        alert("บันทึกไม่สำเร็จ: " + error.message);
+      } finally {
+        btnSave.disabled = false;
+        syncSaveButtonLabel();
+        showLoading(false);
+      }
+    }
+
+    async function deleteEntry(id) {
+      if (!isSupabaseReady) {
+        alert("ยังไม่ได้ตั้งค่า config.js");
+        return;
+      }
+
+      if (!confirm("ยืนยันการลบรายการนี้? ข้อมูลจะหายไปจากฐานข้อมูลทันที")) return;
+
+      showLoading(true);
+
+      try {
+        const { error } = await _supabase
+          .from("budget_entries")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
+
+        entries = entries.filter((e) => e.id !== id);
+        renderSummary();
+        renderList();
+      } catch (error) {
+        console.error("Error deleting data:", error);
+        alert("ลบไม่สำเร็จ: " + error.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    function setType(type) {
+      currentType = type;
+      document.getElementById("btn-income").className = "type-btn" + (type === "income" ? " active-income" : "");
+      document.getElementById("btn-expense").className = "type-btn" + (type === "expense" ? " active-expense" : "");
+      renderPills();
+      updatePreviewBox();
+    }
+
+    function renderPills() {
+      const selected = document.getElementById("category").value;
+      document.getElementById("catPills").innerHTML = CATS[currentType].map((c) => {
+        const safeJs = escapeJsString(c);
+        const selectedClass = selected === c ? " selected" : "";
+        return `<button type="button" class="cat-pill${selectedClass}" onclick="pickCat('${safeJs}')">${escapeHtml(c)}</button>`;
+      }).join("");
+    }
+
+    function pickCat(category) {
+      document.getElementById("category").value = category;
+      renderPills();
+      updatePreviewBox();
+    }
+
+    function switchTab(tab) {
+      document.getElementById("tab-add").classList.toggle("active", tab === "add");
+      document.getElementById("tab-list").classList.toggle("active", tab === "list");
+      document.getElementById("panel-add").classList.toggle("active", tab === "add");
+      document.getElementById("panel-list").classList.toggle("active", tab === "list");
+      if (tab === "list") renderList();
+    }
+
+    function resetForm() {
+      editingId = null;
+      ["amount", "title", "category", "note"].forEach((id) => {
+        document.getElementById(id).value = "";
+      });
+      document.getElementById("date").value = today();
+      document.getElementById("editIndicator").classList.remove("show");
+      setType("income");
+      syncSaveButtonLabel();
+      updatePreviewBox();
+    }
+
+    function cancelEdit() {
+      resetForm();
+    }
+
+    function editEntry(id) {
+      const entry = entries.find((x) => String(x.id) === String(id));
+      if (!entry) return;
+
+      editingId = id;
+      setType(entry.type);
+      document.getElementById("amount").value = entry.amount;
+      document.getElementById("title").value = entry.title;
+      document.getElementById("category").value = entry.category;
+      document.getElementById("date").value = entry.date;
+      document.getElementById("note").value = entry.note || "";
+      document.getElementById("editIndicator").classList.add("show");
+      document.getElementById("editTitle").textContent = entry.title;
+      renderPills();
+      syncSaveButtonLabel();
+      updatePreviewBox();
+      switchTab("add");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderSummary() {
+      const income = entries
+        .filter((e) => e.type === "income")
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      const expense = entries
+        .filter((e) => e.type === "expense")
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      const balance = income - expense;
+
+      document.getElementById("totalIncome").textContent = fc(income);
+      document.getElementById("totalExpense").textContent = fc(expense);
+
+      const balanceEl = document.getElementById("balance");
+      balanceEl.textContent = moneySigned(balance);
+      balanceEl.className = "sum-value " + (balance >= 0 ? "positive" : "negative");
+
+      updateHeroMeta(balance);
+      updatePreviewBox();
+    }
+
+    function getFiltered() {
+      const search = (document.getElementById("search")?.value || "").toLowerCase().trim();
+      const type = document.getElementById("filterType")?.value || "all";
+      const month = document.getElementById("filterMonth")?.value || "";
+
+      return entries
+        .filter((e) => {
+          const inSearch =
+            !search ||
+            String(e.title || "").toLowerCase().includes(search) ||
+            String(e.category || "").toLowerCase().includes(search) ||
+            String(e.note || "").toLowerCase().includes(search);
+
+          const inType = type === "all" || e.type === type;
+          const inMonth = !month || String(e.date || "").startsWith(month);
+
+          return inSearch && inType && inMonth;
+        })
+        .sort(compareEntries);
+    }
+
+    function renderList() {
+      const cont = document.getElementById("entryList");
+
+      if (!isSupabaseReady) {
+        renderConfigMessage();
+        return;
+      }
+
+      const list = getFiltered();
+
+      if (!list.length) {
+        cont.innerHTML = `
+          <div class="empty-state">
+            <div class="big">📭</div>
+            <p>ไม่พบรายการบัญชี</p>
+            <small>ลองเปลี่ยนคำค้นหา ประเภท หรือเดือนที่กรองไว้</small>
+          </div>
+        `;
+        return;
+      }
+
+      const groups = {};
+      list.forEach((entry) => {
+        const monthKey = String(entry.date || "").substring(0, 7);
+        if (!groups[monthKey]) groups[monthKey] = [];
+        groups[monthKey].push(entry);
+      });
+
+      let html = '<div class="entry-list">';
+
+      Object.keys(groups).sort((a, b) => b.localeCompare(a)).forEach((monthKey) => {
+        const [year, month] = monthKey.split("-");
+        const monthIndex = Number(month) - 1;
+
+        const groupIncome = groups[monthKey]
+          .filter((e) => e.type === "income")
+          .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        const groupExpense = groups[monthKey]
+          .filter((e) => e.type === "expense")
+          .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        html += `
+          <div class="month-header">
+            <span>${MONTHS_TH[monthIndex] || monthKey} ${Number(year) + 543}</span>
+            <span>รับ ${fc(groupIncome)} · จ่าย ${fc(groupExpense)}</span>
+          </div>
+        `;
+
+        groups[monthKey].forEach((entry) => {
+          const safeId = escapeJsString(String(entry.id));
+          html += `
+            <div class="entry-item">
+              <div class="entry-dot ${entry.type}"></div>
+              <div class="entry-info">
+                <div class="entry-title">${escapeHtml(entry.title)}</div>
+                <div class="entry-meta">
+                  <span>${escapeHtml(formatThaiDate(entry.date))}</span>
+                  ${entry.category ? `<span class="entry-cat">${escapeHtml(entry.category)}</span>` : ""}
+                  ${entry.note ? `<span>${escapeHtml(entry.note)}</span>` : ""}
+                </div>
+              </div>
+              <div class="entry-amount ${entry.type}">
+                ${entry.type === "income" ? "+" : "-"}${fc(entry.amount)}
+              </div>
+              <div class="entry-actions">
+                <button class="btn btn-ghost btn-sm" onclick="editEntry('${safeId}')">แก้ไข</button>
+                <button class="btn btn-del btn-sm" onclick="deleteEntry('${safeId}')">ลบ</button>
+              </div>
+            </div>
+          `;
+        });
+      });
+
+      html += "</div>";
+      cont.innerHTML = html;
+    }
+
+    function openPdfModal() {
+      document.getElementById("pdfModal").classList.add("open");
+      document.getElementById("pdfMonth").value = today().substring(0, 7);
+    }
+
+    function closePdfModal() {
+      document.getElementById("pdfModal").classList.remove("open");
+    }
+
+    function getPdfList(month, type) {
+      let list = [...entries];
+
+      if (month) {
+        list = list.filter((e) => String(e.date || "").startsWith(month));
+      }
+
+      if (type !== "all") {
+        list = list.filter((e) => e.type === type);
+      }
+
+      return list.sort(compareEntries);
+    }
+
+    function buildPdfMarkup(list, month, type) {
+      const totalIncome = list
+        .filter((e) => e.type === "income")
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      const totalExpense = list
+        .filter((e) => e.type === "expense")
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      const balance = totalIncome - totalExpense;
+
+      const rows = list.map((entry, index) => `
+        <tr>
+          <td style="padding:10px 8px;border:1px solid #d8def3;text-align:center;">${index + 1}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;">${escapeHtml(formatThaiDate(entry.date))}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;">${escapeHtml(entry.type === "income" ? "รายรับ" : "รายจ่าย")}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;">${escapeHtml(entry.title)}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;">${escapeHtml(entry.category || "-")}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;">${escapeHtml(entry.note || "-")}</td>
+          <td style="padding:10px 8px;border:1px solid #d8def3;text-align:right;font-weight:800;color:${entry.type === "income" ? "#1d8f63" : "#d85757"};">
+            ${escapeHtml((entry.type === "income" ? "+" : "-") + fc(entry.amount))}
+          </td>
+        </tr>
+      `).join("");
+
+      return `
+        <div style="width:794px;background:#ffffff;color:#1e213f;padding:28px 24px;font-family:'Noto Sans Thai Variable','Noto Sans Thai',sans-serif;">
+          <div style="padding:20px 22px;border-radius:24px;background:linear-gradient(135deg,#f5f7ff 0%,#eef2ff 100%);border:1px solid #dde3fb;margin-bottom:20px;">
+            <div style="font-size:28px;font-weight:900;line-height:1.2;margin-bottom:10px;color:#1a1d35;">รายงานบัญชีรายรับรายจ่าย</div>
+            <div style="font-size:14px;color:#6d7298;line-height:1.9;">เดือน: ${escapeHtml(formatThaiMonthYear(month))}</div>
+            <div style="font-size:14px;color:#6d7298;line-height:1.9;">ประเภท: ${escapeHtml(typeLabel(type))}</div>
+            <div style="font-size:14px;color:#6d7298;line-height:1.9;">จำนวนรายการ: ${list.length}</div>
+            <div style="font-size:14px;color:#6d7298;line-height:1.9;">สร้างเมื่อ: ${escapeHtml(new Date().toLocaleString("th-TH"))}</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+            <div style="border:1px solid rgba(29,143,99,.18);background:#f2fbf7;border-radius:18px;padding:14px;">
+              <div style="font-size:12px;font-weight:800;color:#6d7298;margin-bottom:6px;">รายรับรวม</div>
+              <div style="font-size:22px;font-weight:900;color:#1d8f63;">${escapeHtml(fc(totalIncome))}</div>
+            </div>
+            <div style="border:1px solid rgba(216,87,87,.18);background:#fff4f4;border-radius:18px;padding:14px;">
+              <div style="font-size:12px;font-weight:800;color:#6d7298;margin-bottom:6px;">รายจ่ายรวม</div>
+              <div style="font-size:22px;font-weight:900;color:#d85757;">${escapeHtml(fc(totalExpense))}</div>
+            </div>
+            <div style="border:1px solid rgba(97,102,245,.18);background:#f4f5ff;border-radius:18px;padding:14px;">
+              <div style="font-size:12px;font-weight:800;color:#6d7298;margin-bottom:6px;">คงเหลือ</div>
+              <div style="font-size:22px;font-weight:900;color:${balance >= 0 ? "#1d8f63" : "#d85757"};">${escapeHtml(moneySigned(balance))}</div>
+            </div>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:#4d54dd;color:#fff;">
+                <th style="padding:10px 8px;border:1px solid #d8def3;">#</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">วันที่</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">ประเภท</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">รายการ</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">หมวดหมู่</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">หมายเหตุ</th>
+                <th style="padding:10px 8px;border:1px solid #d8def3;">จำนวนเงิน</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    async function exportPDF() {
+      if (!entries.length) {
+        alert("ไม่มีข้อมูลสำหรับส่งออก PDF");
+        return;
+      }
+
+      const month = document.getElementById("pdfMonth").value || "";
+      const type = document.getElementById("pdfType").value || "all";
+      const list = getPdfList(month, type);
+
+      if (!list.length) {
+        alert("ไม่มีข้อมูลตามเงื่อนไขที่เลือก");
+        return;
+      }
+
+      const pdfBtn = document.getElementById("pdfExportBtn");
+      const originalText = pdfBtn.textContent;
+      pdfBtn.disabled = true;
+      pdfBtn.textContent = "กำลังสร้าง...";
+      showLoading(true);
+
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.left = "-99999px";
+      wrapper.style.top = "0";
+      wrapper.style.width = "794px";
+      wrapper.style.background = "#ffffff";
+      wrapper.style.zIndex = "-1";
+      wrapper.innerHTML = buildPdfMarkup(list, month, type);
+      document.body.appendChild(wrapper);
+
+      try {
+        if (document.fonts?.ready) {
+          await document.fonts.ready;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 120));
+
+        const target = wrapper.firstElementChild || wrapper;
+        const canvas = await html2canvas(target, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff"
+        });
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("p", "mm", "a4");
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 8;
+        const printableHeight = pageHeight - margin * 2;
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        const imgData = canvas.toDataURL("image/png");
+
+        let heightLeft = imgHeight;
+        let position = margin;
+
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight, undefined, "FAST");
+        heightLeft -= printableHeight;
+
+        while (heightLeft > 0) {
+          pdf.addPage();
+          position = margin - (imgHeight - heightLeft);
+          pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight, undefined, "FAST");
+          heightLeft -= printableHeight;
+        }
+
+        const safeMonth = month || "all";
+        const safeType = type || "all";
+        pdf.save(`budget-report-${safeMonth}-${safeType}.pdf`);
+        closePdfModal();
+      } catch (error) {
+        console.error("PDF export error:", error);
+        alert("ส่งออก PDF ไม่สำเร็จ: " + error.message);
+      } finally {
+        wrapper.remove();
+        pdfBtn.disabled = false;
+        pdfBtn.textContent = originalText;
+        showLoading(false);
+      }
+    }
+
+    document.getElementById("date").value = today();
+
+    document.getElementById("category").addEventListener("input", () => {
+      renderPills();
+      updatePreviewBox();
+    });
+
+    document.getElementById("date").addEventListener("input", updatePreviewBox);
+    document.getElementById("pdfModal").addEventListener("click", (e) => {
+      if (e.target === document.getElementById("pdfModal")) closePdfModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.getElementById("pdfModal").classList.contains("open")) {
+        closePdfModal();
+      }
+    });
+
+    renderPills();
+    syncSaveButtonLabel();
+    updatePreviewBox();
+    updateHeroMeta(0);
+
+    if (isSupabaseReady) {
+      fetchEntries();
+    } else {
+      renderSummary();
+      renderConfigMessage();
+      console.warn("Missing config.js, APP_CONFIG values, or Supabase library");
+    }
+  </script>
+</body>
+</html>
